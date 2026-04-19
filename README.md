@@ -1,19 +1,52 @@
 # fpc-trunk
 
-Unofficial Free Pascal Compiler (FPC) binaries compiled from trunk.
+Unofficial macOS binaries for [Free Pascal Compiler (FPC)](https://www.freepascal.org/) trunk.
 
-## Why
+Built automatically via GitHub Actions (daily) from the latest upstream FPC trunk sources.
 
-FPC does not provide official trunk binaries for macOS. This project builds them
-automatically from the latest FPC trunk source every day, for both Apple Silicon
-(aarch64) and Intel (x86_64).
+Source: [FPC trunk on GitLab](https://gitlab.com/freepascal.org/fpc/source)
 
-## Downloads
+Architectures:
 
-Get the latest builds from the [releases](../../releases/tag/latest) page.
+- aarch64 (Apple Silicon, M1 and later)
+- x86_64 (Intel)
 
-- `fpc-*-aarch64-macosx.dmg` - Apple Silicon (M1 and later)
-- `fpc-*-x86_64-macosx.dmg` - Intel
+No setup, no compiling. Just download the DMG and install.
+
+[![Build Status](https://github.com/viking1304/fpc-trunk/actions/workflows/build.yml/badge.svg)](https://github.com/viking1304/fpc-trunk/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/viking1304/fpc-trunk)](../../releases/latest)
+
+## Quick start
+
+1. Go to the [releases](../../releases/latest) page
+2. Download the latest DMG for your architecture
+3. Open the DMG, double-click the `.pkg` file, follow the installer prompts
+
+Example:
+
+```
+fpc-3.3.1-20260419-aarch64-macosx.dmg
+```
+
+For official FPC releases visit the [download page](https://www.freepascal.org/download.html).
+
+## What is trunk?
+
+Trunk is the development branch of FPC (future 3.3.x). It includes the latest
+features and fixes, but may be unstable.
+
+## Why use this?
+
+- Access the latest FPC features before the official release
+- Test compatibility with upcoming versions
+- No need to build FPC manually on macOS
+
+## How it works
+
+- Builds run daily
+- The workflow pulls the latest FPC trunk source from GitLab
+- Each build is tested with a basic hello world program before packaging
+- Produces ready-to-use macOS DMG packages for both architectures
 
 ## Installation
 
@@ -25,18 +58,26 @@ Get the latest builds from the [releases](../../releases/tag/latest) page.
 The compiler will be installed to `/usr/local/bin`. On Apple Silicon the compiler
 binary is `ppca64`, on Intel it is `ppcx64`.
 
-## Notes
+## Naming convention
 
-- Each build is tested with a basic hello world program before packaging
-- These are trunk builds, expect occasional breakage
-- Not affiliated with the FPC team
+```
+fpc-<version>-<date>-<arch>-macosx.dmg
+```
+
+Example:
+
+```
+fpc-3.3.1-20260419-aarch64-macosx.dmg
+```
+
+## Disclaimer
+
+These are unofficial builds, not official releases from the Free Pascal project,
+and come with no guarantees. Use at your own risk, trunk may contain unstable changes.
 
 ## License
 
 The build scripts in this repository are licensed under **MIT** [license](LICENSE).
-
-The distributed binaries are compiled from the
-[Free Pascal Compiler (FPC)](https://gitlab.com/freepascal.org/fpc/source) source code.
 
 FPC is licensed under **GPL-2.0-or-later** (compiler) and **LGPL-2.0-or-later** with
 linking exception (RTL and packages).
