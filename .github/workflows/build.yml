@@ -177,8 +177,8 @@ jobs:
             fi
           fi
           printf 'FPC trunk build %s\nFPC source commit: %s\n' \
-            '${{ needs.check.outputs.build_date }}' \
-            '${{ needs.check.outputs.fpc_commit }}' > /tmp/release-notes.txt
+            "${{ needs.check.outputs.build_date }}" \
+            "${{ needs.check.outputs.fpc_commit }}" > /tmp/release-notes.txt
           gh release delete "${tag}" --repo ${{ github.repository }} --yes 2>/dev/null || true
           gh release create "${tag}" \
             --repo ${{ github.repository }} \
