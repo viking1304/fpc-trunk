@@ -1,0 +1,174 @@
+name: Build FPC Trunk
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check for new commits
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      fpc_version: ${{ steps.check.outputs.fpc_version }}
+      build_date: ${{ steps.check.outputs.build_date }}
+    steps:
+      - name: Check FPC trunk for changes
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get date of last build from latest release asset filename (fpc-X.X.X-YYYYMMDD-aarch64-...)
+          last_date=""
+          assets=$(gh release list --repo ${{ github.repository }} --limit 1 --json assets \
+            --jq '.[0].assets[].name' 2>/dev/null || true)
+          aarch64_asset=$(echo "${assets}" | grep 'aarch64-macosx' || true)
+          x86_64_asset=$(echo "${assets}" | grep 'x86_64-macosx' || true)
+          if [[ -n "${aarch64_asset}" && -n "${x86_64_asset}" ]]; then
+            last_date=$(echo "${aarch64_asset}" | grep -oE '[0-9]{8}')
+          fi
+
+          git clone --depth 1 https://gitlab.com/freepascal.org/fpc/source.git fpc-src
+
+          changed=true
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" && -n "${last_date}" ]]; then
+            last_commit_date=$(git -C fpc-src log -1 --format=%cd --date=format:%Y%m%d)
+            if [[ "${last_commit_date}" -le "${last_date}" ]]; then
+              changed=false
+            fi
+          fi
+
+          if [[ "${changed}" == "false" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "build_date=$(date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+            fpc_version=$(grep -m1 'PACKAGE_VERSION' fpc-src/Makefile | sed 's/.*PACKAGE_VERSION=//')
+            echo "fpc_version=${fpc_version}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build FPC (${{ matrix.cpu }})
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - cpu: aarch64
+            runner: macos-latest
+          - cpu: x86_64
+            runner: macos-15-intel
+    steps:
+      - name: Download trunk DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --latest --repo ${{ github.repository }} \
+            --pattern "fpc-*-${{ matrix.cpu }}-macosx.dmg" \
+            --output trunk.dmg
+
+      - name: Install bootstrap compiler
+        run: |
+          hdiutil attach trunk.dmg -mountpoint /Volumes/fpc-trunk
+          pkg=$(ls /Volumes/fpc-trunk/*.pkg | head -1 | xargs basename)
+          sudo installer -pkg "/Volumes/fpc-trunk/${pkg}" -target /
+          hdiutil detach /Volumes/fpc-trunk
+
+      - name: Clone FPC source
+        run: |
+          git clone --depth 1 https://gitlab.com/freepascal.org/fpc/source.git fpc-src
+
+      - name: Build FPC
+        run: |
+          sdk="$(xcrun --show-sdk-path)"
+          cd fpc-src
+          if [[ "${{ matrix.cpu }}" == "aarch64" ]]; then
+            make build PP=/usr/local/bin/ppca64 OPT="-XR${sdk}"
+            make install PP=/usr/local/bin/ppca64 OPT="-XR${sdk}" PREFIX="${{ runner.temp }}/fpc-install/usr/local"
+          else
+            make build PP=/usr/local/bin/ppcx64 OPT="-XR${sdk}"
+            make install PP=/usr/local/bin/ppcx64 OPT="-XR${sdk}" PREFIX="${{ runner.temp }}/fpc-install/usr/local"
+          fi
+
+      - name: Test compiler
+        run: |
+          sdk="$(xcrun --show-sdk-path)"
+          cat > /tmp/hello.pas << 'EOF'
+          program Hello;
+          uses SysUtils;
+          begin
+            writeln(Format('Hello FPC %s', [{$I %FPCVERSION%}]))
+          end.
+          EOF
+          if [[ "${{ matrix.cpu }}" == "aarch64" ]]; then
+            /usr/local/bin/ppca64 /tmp/hello.pas -o/tmp/hello -XR"${sdk}"
+          else
+            /usr/local/bin/ppcx64 /tmp/hello.pas -o/tmp/hello -XR"${sdk}"
+          fi
+          /tmp/hello
+
+      - name: Create pkg
+        run: |
+          pkgbuild \
+            --root "${{ runner.temp }}/fpc-install" \
+            --identifier org.freepascal.fpc.trunk.${{ matrix.cpu }} \
+            --version ${{ needs.check.outputs.fpc_version }} \
+            --install-location / \
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.pkg
+
+      - name: Create DMG
+        run: |
+          pkg="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.pkg"
+          vol="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx"
+          dmg_rw="${vol}-rw.dmg"
+          dmg_out="${vol}.dmg"
+          pkg_size=$(du -sm "${pkg}" | cut -f1)
+          dmg_size=$(( pkg_size + 20 ))
+          hdiutil create -volname "${vol}" -size "${dmg_size}m" -fs HFS+ -ov "${dmg_rw}"
+          hdiutil attach "${dmg_rw}" -mountpoint /Volumes/fpc-pkg
+          cp "${pkg}" /Volumes/fpc-pkg/
+          hdiutil detach /Volumes/fpc-pkg
+          hdiutil convert "${dmg_rw}" -format UDZO -ov -o "${dmg_out}"
+          rm "${dmg_rw}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpc-trunk-${{ matrix.cpu }}
+          path: fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.dmg
+
+  release:
+    name: Publish release
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fpc-trunk-*
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}"
+          if gh release view "${tag}" --repo ${{ github.repository }} > /dev/null 2>&1; then
+            prev_tag=$(gh release list --repo ${{ github.repository }} --limit 10 --json tagName \
+              --jq '[.[].tagName | select(. != "'"${tag}"'")][0]')
+            if [[ -n "${prev_tag}" ]]; then
+              gh release edit "${prev_tag}" --repo ${{ github.repository }} --latest
+            fi
+          fi
+          gh release delete "${tag}" --repo ${{ github.repository }} --yes 2>/dev/null || true
+          gh release create "${tag}" \
+            --repo ${{ github.repository }} \
+            --title "FPC ${{ needs.check.outputs.fpc_version }} trunk (${tag})" \
+            --notes "FPC trunk build ${{ needs.check.outputs.build_date }}" \
+            --latest \
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-aarch64-macosx.dmg \
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-x86_64-macosx.dmg
