@@ -14,6 +14,7 @@ jobs:
       fpc_version: ${{ steps.check.outputs.fpc_version }}
       build_date: ${{ steps.check.outputs.build_date }}
       fpc_commit: ${{ steps.check.outputs.fpc_commit }}
+      fpc_commit_title: ${{ steps.check.outputs.fpc_commit_title }}
     steps:
       - name: Check FPC trunk for changes
         id: check
@@ -48,6 +49,7 @@ jobs:
             fpc_version=$(grep -m1 'PACKAGE_VERSION' fpc-src/Makefile | sed 's/.*PACKAGE_VERSION=//')
             echo "fpc_version=${fpc_version}" >> "$GITHUB_OUTPUT"
             echo "fpc_commit=$(git -C fpc-src log -1 --format=%H)" >> "$GITHUB_OUTPUT"
+            echo "fpc_commit_title=$(git -C fpc-src log -1 --format=%s)" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -176,9 +178,14 @@ jobs:
               gh release edit "${prev_tag}" --repo ${{ github.repository }} --latest
             fi
           fi
-          printf 'FPC trunk build %s\nFPC source commit: %s\n' \
+          full_hash="${{ needs.check.outputs.fpc_commit }}"
+          short_hash="${full_hash:0:8}"
+          commit_url="https://gitlab.com/freepascal.org/fpc/source/-/commit/${full_hash}"
+          printf 'FPC trunk build %s\nFPC source commit: [%s](%s) %s\n' \
             "${{ needs.check.outputs.build_date }}" \
-            "${{ needs.check.outputs.fpc_commit }}" > /tmp/release-notes.txt
+            "${short_hash}" \
+            "${commit_url}" \
+            "${{ needs.check.outputs.fpc_commit_title }}" > /tmp/release-notes.txt
           gh release delete "${tag}" --repo ${{ github.repository }} --yes 2>/dev/null || true
           gh release create "${tag}" \
             --repo ${{ github.repository }} \
