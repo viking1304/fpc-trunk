@@ -82,4 +82,4 @@ The build scripts in this repository are licensed under **MIT** [license](LICENS
 FPC is licensed under **GPL-2.0-or-later** (compiler) and **LGPL-2.0-or-later** with
 linking exception (RTL and packages).
 
-Each release includes the FPC source commit hash in the release notes.
+Each release includes a linked short commit hash and commit title in the release notes.
