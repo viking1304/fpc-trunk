@@ -13,7 +13,6 @@ jobs:
       changed: ${{ steps.check.outputs.changed }}
       fpc_version: ${{ steps.check.outputs.fpc_version }}
       fpc_revision: ${{ steps.check.outputs.fpc_revision }}
-      build_date: ${{ steps.check.outputs.build_date }}
       fpc_commit: ${{ steps.check.outputs.fpc_commit }}
       fpc_commit_title: ${{ steps.check.outputs.fpc_commit_title }}
     steps:
@@ -38,7 +37,6 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "fpc_revision=${fpc_revision}" >> "$GITHUB_OUTPUT"
-            echo "build_date=$(date +%Y%m%d)" >> "$GITHUB_OUTPUT"
             fpc_version=$(grep -m1 'PACKAGE_VERSION' fpc-src/Makefile | sed 's/.*PACKAGE_VERSION=//')
             echo "fpc_version=${fpc_version}" >> "$GITHUB_OUTPUT"
             echo "fpc_commit=$(git -C fpc-src log -1 --format=%H)" >> "$GITHUB_OUTPUT"
@@ -109,12 +107,12 @@ jobs:
             --identifier org.freepascal.fpc.trunk.${{ matrix.cpu }} \
             --version ${{ needs.check.outputs.fpc_version }} \
             --install-location / \
-            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.pkg
+            fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.pkg
 
       - name: Create DMG
         run: |
-          pkg="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.pkg"
-          vol="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx"
+          pkg="fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.pkg"
+          vol="fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx"
           dmg_rw="${vol}-rw.dmg"
           dmg_out="${vol}.dmg"
           pkg_size=$(du -sm "${pkg}" | cut -f1)
@@ -130,7 +128,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fpc-trunk-${{ matrix.cpu }}
-          path: fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-${{ matrix.cpu }}-macosx.dmg
+          path: fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.dmg
 
   release:
     name: Publish release
@@ -168,8 +166,8 @@ jobs:
             --title "FPC ${{ needs.check.outputs.fpc_version }} trunk (${{ needs.check.outputs.fpc_revision }})" \
             --notes-file /tmp/release-notes.txt \
             --latest \
-            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-aarch64-macosx.dmg \
-            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.build_date }}-x86_64-macosx.dmg
+            fpc-${{ needs.check.outputs.fpc_revision }}-aarch64-macosx.dmg \
+            fpc-${{ needs.check.outputs.fpc_revision }}-x86_64-macosx.dmg
 
   update-cask:
     name: Update Homebrew cask

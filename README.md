@@ -25,7 +25,7 @@ No setup, no compiling. Just download the DMG and install.
 Example:
 
 ```
-fpc-3.3.1-20260419-aarch64-macosx.dmg
+fpc-3.3.1-20098-g4fe20ded55-aarch64-macosx.dmg
 ```
 
 For official FPC releases visit the [download page](https://www.freepascal.org/download.html).
@@ -61,13 +61,13 @@ binary is `ppca64`, on Intel it is `ppcx64`.
 ## Naming convention
 
 ```
-fpc-<version>-<date>-<arch>-macosx.dmg
+fpc-<version>-<commits>-<hash>-<arch>-macosx.dmg
 ```
 
 Example:
 
 ```
-fpc-3.3.1-20260419-aarch64-macosx.dmg
+fpc-3.3.1-20098-g4fe20ded55-aarch64-macosx.dmg
 ```
 
 ## Disclaimer
