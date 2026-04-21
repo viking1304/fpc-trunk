@@ -1,0 +1,77 @@
+name: Update Homebrew Cask
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v3.3.1-20260421), leave empty to use latest'
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        type: string
+
+jobs:
+  update-cask:
+    name: Update homebrew-fpc cask
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag }}"
+          if [[ -z "${tag}" ]]; then
+            tag=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName \
+              --jq '.[0].tagName')
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          version=$(echo "${tag}" | sed 's/^v//' | cut -d- -f1)
+          build_date=$(echo "${tag}" | sed 's/^v//' | cut -d- -f2)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate SHA256
+        id: sha256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.resolve.outputs.version }}"
+          build_date="${{ steps.resolve.outputs.build_date }}"
+          tag="${{ steps.resolve.outputs.tag }}"
+
+          arm_dmg="fpc-${version}-${build_date}-aarch64-macosx.dmg"
+          intel_dmg="fpc-${version}-${build_date}-x86_64-macosx.dmg"
+
+          arm_sha=$(gh release download "${tag}" --repo ${{ github.repository }} \
+            --pattern "${arm_dmg}" --output - | shasum -a 256 | awk '{print $1}')
+          intel_sha=$(gh release download "${tag}" --repo ${{ github.repository }} \
+            --pattern "${intel_dmg}" --output - | shasum -a 256 | awk '{print $1}')
+
+          echo "arm=${arm_sha}" >> "$GITHUB_OUTPUT"
+          echo "intel=${intel_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Update cask
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_FPC_TOKEN }}
+        run: |
+          version="${{ steps.resolve.outputs.version }}"
+          build_date="${{ steps.resolve.outputs.build_date }}"
+          cask_file="Casks/fpc@dev.rb"
+
+          git clone https://x-access-token:${GH_TOKEN}@github.com/viking1304/homebrew-fpc.git homebrew-fpc
+          cd homebrew-fpc
+
+          sed -i "s/version \".*\"/version \"${version},${build_date}\"/" "${cask_file}"
+          sed -i "s/sha256 arm:   \"[a-f0-9]*\"/sha256 arm:   \"${{ steps.sha256.outputs.arm }}\"/" "${cask_file}"
+          sed -i "s/       intel: \"[a-f0-9]*\"/       intel: \"${{ steps.sha256.outputs.intel }}\"/" "${cask_file}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${cask_file}"
+          git commit -m "feat: Update fpc@dev to ${version},${build_date}"
+          git push
