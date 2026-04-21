@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v3.3.1-20260421), leave empty to use latest'
+        description: 'Release tag (e.g. v3.3.1-20098-g4fe20ded55), leave empty to use latest'
         required: false
         default: ''
   workflow_call:
@@ -19,7 +19,7 @@ jobs:
     name: Update homebrew-fpc cask
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve tag
+      - name: Resolve tag and asset names
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
@@ -30,8 +30,17 @@ jobs:
               --jq '.[0].tagName')
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          version=$(echo "${tag}" | sed 's/^v//' | cut -d- -f1)
-          build_date=$(echo "${tag}" | sed 's/^v//' | cut -d- -f2)
+
+          arm_dmg=$(gh release view "${tag}" --repo ${{ github.repository }} --json assets \
+            --jq '.assets[].name' | grep 'aarch64-macosx')
+          intel_dmg=$(gh release view "${tag}" --repo ${{ github.repository }} --json assets \
+            --jq '.assets[].name' | grep 'x86_64-macosx')
+
+          echo "arm_dmg=${arm_dmg}" >> "$GITHUB_OUTPUT"
+          echo "intel_dmg=${intel_dmg}" >> "$GITHUB_OUTPUT"
+
+          version=$(echo "${arm_dmg}" | sed 's/fpc-//' | cut -d- -f1)
+          build_date=$(echo "${arm_dmg}" | sed 's/fpc-//' | cut -d- -f2)
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
 
@@ -40,17 +49,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${{ steps.resolve.outputs.version }}"
-          build_date="${{ steps.resolve.outputs.build_date }}"
           tag="${{ steps.resolve.outputs.tag }}"
 
-          arm_dmg="fpc-${version}-${build_date}-aarch64-macosx.dmg"
-          intel_dmg="fpc-${version}-${build_date}-x86_64-macosx.dmg"
-
           arm_sha=$(gh release download "${tag}" --repo ${{ github.repository }} \
-            --pattern "${arm_dmg}" --output - | shasum -a 256 | awk '{print $1}')
+            --pattern "${{ steps.resolve.outputs.arm_dmg }}" --output - | shasum -a 256 | awk '{print $1}')
           intel_sha=$(gh release download "${tag}" --repo ${{ github.repository }} \
-            --pattern "${intel_dmg}" --output - | shasum -a 256 | awk '{print $1}')
+            --pattern "${{ steps.resolve.outputs.intel_dmg }}" --output - | shasum -a 256 | awk '{print $1}')
 
           echo "arm=${arm_sha}" >> "$GITHUB_OUTPUT"
           echo "intel=${intel_sha}" >> "$GITHUB_OUTPUT"
