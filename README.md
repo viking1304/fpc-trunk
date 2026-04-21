@@ -1,6 +1,6 @@
 # fpc-trunk
 
-Unofficial macOS binaries for [Free Pascal Compiler (FPC)](https://www.freepascal.org/) trunk.
+Unofficial macOS binaries for the [Free Pascal Compiler (FPC)](https://www.freepascal.org/) development version (trunk, future 3.3.x).
 
 Built automatically via GitHub Actions (daily) from the latest upstream FPC trunk sources.
 
@@ -77,9 +77,8 @@ and come with no guarantees. Use at your own risk, trunk may contain unstable ch
 
 ## License
 
-The build scripts in this repository are licensed under **MIT** [license](LICENSE).
+This repository (build scripts) is licensed under the [MIT License](LICENSE).
 
-FPC is licensed under **GPL-2.0-or-later** (compiler) and **LGPL-2.0-or-later** with
-linking exception (RTL and packages).
+Free Pascal Compiler (FPC) is licensed under GPL-2.0-or-later, with RTL and packages under LGPL-2.0-or-later with linking exception.
 
 Each release includes a linked short commit hash and commit title in the release notes.
