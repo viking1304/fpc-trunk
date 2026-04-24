@@ -39,9 +39,9 @@ jobs:
           echo "arm_dmg=${arm_dmg}" >> "$GITHUB_OUTPUT"
           echo "intel_dmg=${intel_dmg}" >> "$GITHUB_OUTPUT"
 
-          # fpc-3.3.1-20098-g4fe20ded55-aarch64-macosx.dmg -> version=3.3.1, short_hash=g4fe20ded55
+          # fpc-3.3.1-g4fe20ded55-aarch64-macosx.dmg -> version=3.3.1, short_hash=g4fe20ded55
           version=$(echo "${arm_dmg}" | sed 's/^fpc-//' | cut -d- -f1)
-          short_hash=$(echo "${arm_dmg}" | sed 's/^fpc-//' | cut -d- -f3)
+          short_hash=$(echo "${arm_dmg}" | sed 's/^fpc-//' | cut -d- -f2)
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "short_hash=${short_hash}" >> "$GITHUB_OUTPUT"
 

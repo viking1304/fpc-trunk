@@ -13,6 +13,7 @@ jobs:
       changed: ${{ steps.check.outputs.changed }}
       fpc_version: ${{ steps.check.outputs.fpc_version }}
       fpc_revision: ${{ steps.check.outputs.fpc_revision }}
+      fpc_short_hash: ${{ steps.check.outputs.fpc_short_hash }}
       fpc_commit: ${{ steps.check.outputs.fpc_commit }}
       fpc_commit_title: ${{ steps.check.outputs.fpc_commit_title }}
     steps:
@@ -24,11 +25,12 @@ jobs:
           git clone https://gitlab.com/freepascal.org/fpc/source.git fpc-src
 
           fpc_revision=$(git -C fpc-src describe)
-          last_revision=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName \
-            --jq '.[0].tagName' 2>/dev/null | sed 's/^v//' || true)
+          fpc_short_hash_early=$(echo "${fpc_revision}" | grep -o 'g[0-9a-f]*$')
+          last_short_hash=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName \
+            --jq '.[0].tagName' 2>/dev/null | grep -o 'g[0-9a-f]*$' || true)
 
           changed=true
-          if [[ "${{ github.event_name }}" != "workflow_dispatch" && "${fpc_revision}" == "${last_revision}" ]]; then
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" && "${fpc_short_hash_early}" == "${last_short_hash}" ]]; then
             changed=false
           fi
 
@@ -39,6 +41,8 @@ jobs:
             echo "fpc_revision=${fpc_revision}" >> "$GITHUB_OUTPUT"
             fpc_version=$(grep -m1 'PACKAGE_VERSION' fpc-src/Makefile | sed 's/.*PACKAGE_VERSION=//')
             echo "fpc_version=${fpc_version}" >> "$GITHUB_OUTPUT"
+            fpc_short_hash=$(echo "${fpc_revision}" | grep -o 'g[0-9a-f]*$')
+            echo "fpc_short_hash=${fpc_short_hash}" >> "$GITHUB_OUTPUT"
             echo "fpc_commit=$(git -C fpc-src log -1 --format=%H)" >> "$GITHUB_OUTPUT"
             echo "fpc_commit_title=$(git -C fpc-src log -1 --format=%s)" >> "$GITHUB_OUTPUT"
           fi
@@ -107,12 +111,12 @@ jobs:
             --identifier org.freepascal.fpc.trunk.${{ matrix.cpu }} \
             --version ${{ needs.check.outputs.fpc_version }} \
             --install-location / \
-            fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.pkg
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-${{ matrix.cpu }}-macosx.pkg
 
       - name: Create DMG
         run: |
-          pkg="fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.pkg"
-          vol="fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx"
+          pkg="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-${{ matrix.cpu }}-macosx.pkg"
+          vol="fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-${{ matrix.cpu }}-macosx"
           dmg_rw="${vol}-rw.dmg"
           dmg_out="${vol}.dmg"
           pkg_size=$(du -sm "${pkg}" | cut -f1)
@@ -128,7 +132,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fpc-trunk-${{ matrix.cpu }}
-          path: fpc-${{ needs.check.outputs.fpc_revision }}-${{ matrix.cpu }}-macosx.dmg
+          path: fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-${{ matrix.cpu }}-macosx.dmg
 
   release:
     name: Publish release
@@ -147,7 +151,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v${{ needs.check.outputs.fpc_revision }}"
+          tag="v${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}"
           prev_tag=$(gh release list --repo ${{ github.repository }} --limit 1 --json tagName \
             --jq '.[0].tagName' 2>/dev/null || true)
           if [[ -n "${prev_tag}" && "${prev_tag}" != "${tag}" ]]; then
@@ -166,13 +170,13 @@ jobs:
             --title "FPC ${{ needs.check.outputs.fpc_version }} trunk (${{ needs.check.outputs.fpc_revision }})" \
             --notes-file /tmp/release-notes.txt \
             --latest \
-            fpc-${{ needs.check.outputs.fpc_revision }}-aarch64-macosx.dmg \
-            fpc-${{ needs.check.outputs.fpc_revision }}-x86_64-macosx.dmg
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-aarch64-macosx.dmg \
+            fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-x86_64-macosx.dmg
 
   update-cask:
     name: Update Homebrew cask
     needs: [check, release]
     uses: ./.github/workflows/update-cask.yml
     with:
-      tag: v${{ needs.check.outputs.fpc_revision }}
+      tag: v${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}
     secrets: inherit
