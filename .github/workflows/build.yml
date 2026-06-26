@@ -131,7 +131,7 @@ jobs:
           rm "${dmg_rw}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fpc-trunk-${{ matrix.cpu }}
           path: fpc-${{ needs.check.outputs.fpc_version }}-${{ needs.check.outputs.fpc_short_hash }}-${{ matrix.cpu }}-macosx.dmg
@@ -144,7 +144,7 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: fpc-trunk-*
           merge-multiple: true
